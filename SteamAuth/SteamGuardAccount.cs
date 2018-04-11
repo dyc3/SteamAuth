@@ -132,44 +132,7 @@ namespace SteamAuth
 
             string response = SteamWeb.Request(url, "GET", "", cookies);
 
-            /*So you're going to see this abomination and you're going to be upset.
-              It's understandable. But the thing is, regex for HTML -- while awful -- makes this way faster than parsing a DOM, plus we don't need another library.
-              And because the data is always in the same place and same format... It's not as if we're trying to naturally understand HTML here. Just extract strings.
-              I'm sorry. */
-
-            Regex confRegex = new Regex("<div class=\"mobileconf_list_entry\" id=\"conf[0-9]+\" data-confid=\"(\\d+)\" data-key=\"(\\d+)\" data-type=\"(\\d+)\" data-creator=\"(\\d+)\"");
-
-            if (response == null || !confRegex.IsMatch(response))
-            {
-                if (response == null || !response.Contains("<div>Nothing to confirm</div>"))
-                {
-                    throw new WGTokenInvalidException();
-                }
-
-                return new Confirmation[0];
-            }
-
-            MatchCollection confirmations = confRegex.Matches(response);
-
-            List<Confirmation> ret = new List<Confirmation>();
-            foreach (Match confirmation in confirmations)
-            {
-                if (confirmation.Groups.Count != 5) continue;
-
-                ulong confID, confKey, confCreator;
-                int confType;
-                if (!ulong.TryParse(confirmation.Groups[1].Value, out confID) ||
-                    !ulong.TryParse(confirmation.Groups[2].Value, out confKey) ||
-                    !int.TryParse(confirmation.Groups[3].Value, out confType) ||
-                    !ulong.TryParse(confirmation.Groups[4].Value, out confCreator))
-                {
-                    continue;
-                }
-
-                ret.Add(new Confirmation(confID, confKey, confType, confCreator));
-            }
-
-            return ret.ToArray();
+            return parseConfirmationHTML(response);
         }
 
         public async Task<Confirmation[]> FetchConfirmationsAsync()
@@ -181,12 +144,18 @@ namespace SteamAuth
 
             string response = await SteamWeb.RequestAsync(url, "GET", null, cookies);
 
+            return parseConfirmationHTML(response);
+        }
+
+        private Confirmation[] parseConfirmationHTML(string response)
+        {
             /*So you're going to see this abomination and you're going to be upset.
-                          It's understandable. But the thing is, regex for HTML -- while awful -- makes this way faster than parsing a DOM, plus we don't need another library.
-                          And because the data is always in the same place and same format... It's not as if we're trying to naturally understand HTML here. Just extract strings.
-                          I'm sorry. */
+            It's understandable. But the thing is, regex for HTML -- while awful -- makes this way faster than parsing a DOM, plus we don't need another library.
+            And because the data is always in the same place and same format... It's not as if we're trying to naturally understand HTML here. Just extract strings.
+            I'm sorry. */
 
             Regex confRegex = new Regex("<div class=\"mobileconf_list_entry\" id=\"conf[0-9]+\" data-confid=\"(\\d+)\" data-key=\"(\\d+)\" data-type=\"(\\d+)\" data-creator=\"(\\d+)\"");
+            Regex confDescRegex = new Regex("<div>((Confirm|Trade|Sell -) .+)</div>");
 
             if (response == null || !confRegex.IsMatch(response))
             {
@@ -199,10 +168,16 @@ namespace SteamAuth
             }
 
             MatchCollection confirmations = confRegex.Matches(response);
+            MatchCollection confDescs = confDescRegex.Matches(response);
+            if (confirmations.Count != confDescs.Count)
+            {
+                Console.WriteLine("WARNING: counts of confirmations matches and descriptions matches are not equal: ${confirmations.Count} != ${confDescs.Count}");
+            }
 
             List<Confirmation> ret = new List<Confirmation>();
-            foreach (Match confirmation in confirmations)
+            for (int i = 0; i < confirmations.Count; i++)
             {
+                Match confirmation = confirmations[i];
                 if (confirmation.Groups.Count != 5) continue;
 
                 ulong confID, confKey, confCreator;
@@ -215,7 +190,11 @@ namespace SteamAuth
                     continue;
                 }
 
-                ret.Add(new Confirmation(confID, confKey, confType, confCreator));
+                Match description = confDescs[i];
+                string desc = description.Groups[1].Value;
+                desc = Regex.Replace(desc, "<.*?>", ""); // remove any HTML elements, but retain text within.
+
+                ret.Add(new Confirmation(confID, confKey, confType, confCreator, desc));
             }
 
             return ret.ToArray();

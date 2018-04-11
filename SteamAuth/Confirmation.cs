@@ -29,16 +29,22 @@ namespace SteamAuth
         public ulong Creator;
 
         /// <summary>
+        /// A human-readable representation of this confirmation.
+        /// </summary>
+        public string Description;
+
+        /// <summary>
         /// The type of this confirmation.
         /// </summary>
         public ConfirmationType ConfType;
-        
-        public Confirmation(ulong id, ulong key, int type, ulong creator)
+
+        public Confirmation(ulong id, ulong key, int type, ulong creator, string description)
         {
             this.ID = id;
             this.Key = key;
             this.IntType = type;
             this.Creator = creator;
+            this.Description = description;
 
             //Do a switch simply because we're not 100% certain of all the possible types.
             switch (type)
