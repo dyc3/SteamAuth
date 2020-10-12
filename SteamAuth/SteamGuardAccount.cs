@@ -131,8 +131,7 @@ namespace SteamAuth
             this.Session.AddCookies(cookies);
 
             string response = SteamWeb.Request(url, "GET", "", cookies);
-
-            return parseConfirmationHTML(response);
+            return FetchConfirmationInternal(response);
         }
 
         public async Task<Confirmation[]> FetchConfirmationsAsync()
@@ -143,6 +142,11 @@ namespace SteamAuth
             this.Session.AddCookies(cookies);
 
             string response = await SteamWeb.RequestAsync(url, "GET", null, cookies);
+            return FetchConfirmationInternal(response);
+        }
+
+        private Confirmation[] FetchConfirmationInternal(string response)
+        {
 
             return parseConfirmationHTML(response);
         }
@@ -150,9 +154,9 @@ namespace SteamAuth
         private Confirmation[] parseConfirmationHTML(string response)
         {
             /*So you're going to see this abomination and you're going to be upset.
-            It's understandable. But the thing is, regex for HTML -- while awful -- makes this way faster than parsing a DOM, plus we don't need another library.
-            And because the data is always in the same place and same format... It's not as if we're trying to naturally understand HTML here. Just extract strings.
-            I'm sorry. */
+              It's understandable. But the thing is, regex for HTML -- while awful -- makes this way faster than parsing a DOM, plus we don't need another library.
+              And because the data is always in the same place and same format... It's not as if we're trying to naturally understand HTML here. Just extract strings.
+              I'm sorry. */
 
             Regex confRegex = new Regex("<div class=\"mobileconf_list_entry\" id=\"conf[0-9]+\" data-confid=\"(\\d+)\" data-key=\"(\\d+)\" data-type=\"(\\d+)\" data-creator=\"(\\d+)\"");
             Regex confDescRegex = new Regex("<div>((Confirm|Trade|Sell -) .+)</div>");
